@@ -9,8 +9,9 @@ Added support to handle client invocation via either rundll32 or regsvr32 method
       http://en.wooyun.io/2016/01/18/JavaScript-Backdoor.html<br/>
       http://en.wooyun.io/2016/02/04/42.html<br/>
 
-Video Demo:
-https://youtu.be/0nx04OaIG04
+Video Demos:<br/>
+https://youtu.be/0nx04OaIG04<br/>
+https://youtu.be/tGIndE7aexI<br/>
 
 Big Thanks to SubTee!
 
